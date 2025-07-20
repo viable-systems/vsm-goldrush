@@ -90,6 +90,20 @@ defmodule VsmGoldrush do
   end
   
   @doc """
+  Test if an event matches a compiled pattern.
+  
+  Returns `{:ok, true}` if the event matches, `{:ok, false}` if not,
+  or `{:error, reason}` if there's an issue.
+  """
+  @spec test_event(pattern_id(), vsm_event()) :: {:ok, boolean()}
+  def test_event(pattern_id, event) when is_atom(pattern_id) and is_map(event) do
+    case process_event(pattern_id, event) do
+      {:match, _event} -> {:ok, true}
+      :no_match -> {:ok, false}
+    end
+  end
+
+  @doc """
   Process an event through a compiled pattern.
   """
   @spec process_event(pattern_id(), vsm_event()) :: match_result()

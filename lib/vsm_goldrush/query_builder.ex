@@ -147,18 +147,45 @@ defmodule VsmGoldrush.QueryBuilder do
     {:error, "Unknown VSM pattern: #{pattern}"}
   end
   
-  # Temporal patterns require state tracking
+  @doc """
+  Build temporal sequence query for detecting event patterns over time.
+  """
+  def build_temporal_query(%{type: :temporal_sequence, sequence: events}) do
+    # For sequences, build a query that matches the first event
+    # The actual sequence logic is handled by the temporal wrapper
+    case List.first(events) do
+      nil -> {:error, "Empty sequence"}
+      first_event -> build_query(first_event)
+    end
+  end
+  
+  @doc """
+  Build temporal frequency query for counting events in time windows.
+  """
+  def build_frequency_query(%{type: :temporal_frequency, filter: filter}) do
+    # Build a base query for the event filter
+    # Frequency counting is handled by the temporal wrapper
+    build_query(filter)
+  end
+  
+  @doc """
+  Build temporal correlation query for trigger-response patterns.
+  """
+  def build_correlation_query(%{type: :temporal_correlation, trigger: trigger}) do
+    # Build a query that matches the trigger event
+    # Response correlation is handled by the temporal wrapper
+    build_query(trigger)
+  end
+  
+  # Legacy temporal patterns (kept for backward compatibility)
   defp build_temporal_query(:frequency, %{field: field, threshold: _threshold, window: _window}) do
-    # For frequency patterns, we use a counting query
     {:ok, :glc.all([
       :glc.wc(field),
-      # This is a placeholder - actual temporal logic needs state
       :glc.eq(:_temporal_marker, true)
     ])}
   end
   
   defp build_temporal_query(:sequence, %{events: events, window: _window}) do
-    # Sequence detection needs stateful processing
     first_event = List.first(events)
     case build_query(first_event) do
       {:ok, query} -> {:ok, query}
