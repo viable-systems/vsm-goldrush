@@ -151,7 +151,6 @@ defmodule VsmGoldrush.Consumer do
       case VsmGoldrush.test_event(pattern_id, event) do
         {:ok, true} -> true
         {:ok, false} -> false
-        {:error, _reason} -> false
       end
     end)
   end

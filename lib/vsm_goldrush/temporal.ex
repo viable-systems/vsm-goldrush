@@ -45,6 +45,9 @@ defmodule VsmGoldrush.Temporal do
             # Initialize temporal state for this pattern
             init_temporal_state(pattern_id, query_spec)
             
+            # Register with the main pattern registry
+            VsmGoldrush.PatternRegistry.register(pattern_id)
+            
             Logger.info("Compiled temporal sequence pattern: #{pattern_id}")
             {:ok, pattern_id}
           
@@ -90,6 +93,9 @@ defmodule VsmGoldrush.Temporal do
             # Initialize frequency tracking for this pattern
             init_frequency_state(pattern_id, query_spec)
             
+            # Register with the main pattern registry
+            VsmGoldrush.PatternRegistry.register(pattern_id)
+            
             Logger.info("Compiled temporal frequency pattern: #{pattern_id}")
             {:ok, pattern_id}
           
@@ -134,6 +140,9 @@ defmodule VsmGoldrush.Temporal do
             # Initialize correlation tracking for this pattern
             init_correlation_state(pattern_id, query_spec)
             
+            # Register with the main pattern registry
+            VsmGoldrush.PatternRegistry.register(pattern_id)
+            
             Logger.info("Compiled temporal correlation pattern: #{pattern_id}")
             {:ok, pattern_id}
           
@@ -151,12 +160,18 @@ defmodule VsmGoldrush.Temporal do
   Get temporal statistics for a pattern (events in time windows, frequencies, etc.).
   """
   def get_temporal_stats(pattern_id) do
-    case :ets.lookup(:vsm_temporal_state, pattern_id) do
-      [{^pattern_id, state}] ->
-        {:ok, format_temporal_stats(state)}
-      
-      [] ->
+    case :ets.whereis(:vsm_temporal_state) do
+      :undefined ->
         {:error, :pattern_not_found}
+      
+      _table ->
+        case :ets.lookup(:vsm_temporal_state, pattern_id) do
+          [{^pattern_id, state}] ->
+            {:ok, format_temporal_stats(state)}
+          
+          [] ->
+            {:error, :pattern_not_found}
+        end
     end
   end
   
@@ -164,8 +179,14 @@ defmodule VsmGoldrush.Temporal do
   Clear temporal state for a pattern (useful for testing or reset).
   """
   def clear_temporal_state(pattern_id) do
-    :ets.delete(:vsm_temporal_state, pattern_id)
-    :ok
+    case :ets.whereis(:vsm_temporal_state) do
+      :undefined ->
+        :ok
+      
+      _table ->
+        :ets.delete(:vsm_temporal_state, pattern_id)
+        :ok
+    end
   end
   
   # Private helper functions
