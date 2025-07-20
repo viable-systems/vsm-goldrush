@@ -21,3 +21,6 @@ vsm_goldrush-*.tar
 
 # Temporary files, for example, from tests.
 /tmp/
+
+# Claude Code hook logs
+.claude/hooks/logs/
