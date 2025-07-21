@@ -56,7 +56,27 @@ defmodule VsmGoldrush.MixProject do
       {:dialyxir, "~> 1.4", only: [:dev], runtime: false},
       {:excoveralls, "~> 0.18", only: :test},
       {:benchee, "~> 1.3", only: :dev}
-    ]
+    ] ++ vsm_deps()
+  end
+  
+  defp vsm_deps do
+    if in_umbrella?() do
+      [
+        {:vsm_core, in_umbrella: true}
+      ]
+    else
+      [
+        {:vsm_core, path: "../vsm-core"}
+      ]
+    end
+  end
+  
+  defp in_umbrella? do
+    # Check if we're being compiled as part of an umbrella project
+    case System.get_env("MIX_BUILD_PATH") do
+      nil -> false
+      path -> String.contains?(path, "_build/#{Mix.env()}/lib")
+    end
   end
   
   defp package do
