@@ -61,9 +61,8 @@ defmodule VsmGoldrush.MixProject do
   
   defp vsm_deps do
     if in_umbrella?() do
-      [
-        {:vsm_core, in_umbrella: true}
-      ]
+      # In umbrella mode, dependencies are managed by the umbrella project
+      []
     else
       [
         {:vsm_core, path: "../vsm-core"}
@@ -72,11 +71,7 @@ defmodule VsmGoldrush.MixProject do
   end
   
   defp in_umbrella? do
-    # Check if we're being compiled as part of an umbrella project
-    case System.get_env("MIX_BUILD_PATH") do
-      nil -> false
-      path -> String.contains?(path, "_build/#{Mix.env()}/lib")
-    end
+    Mix.Project.umbrella?()
   end
   
   defp package do
