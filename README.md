@@ -1,166 +1,91 @@
-# VsmGoldrush
+# vsm_goldrush
 
-A high-performance VSM-aware wrapper for the [goldrush](https://github.com/DeadZen/goldrush) Erlang event processing library. This library provides compiled query patterns for detecting cybernetic failures in Viable System Model implementations.
+Elixir wrapper around the Erlang [goldrush](https://github.com/DeadZen/goldrush) event processing library. Compiles pattern-matching queries into BEAM modules via goldrush, then runs VSM-specific cybernetic failure detection against those compiled queries.
 
-## Key Features
+## Status
 
-- **Compiled Queries**: Patterns are compiled to BEAM bytecode for maximum performance
-- **VSM Cybernetic Patterns**: Pre-defined patterns for variety explosion, channel saturation, algedonic signals, etc.
-- **Native Goldrush Integration**: Actually uses goldrush's query compilation engine
-- **Built-in Statistics**: Track pattern matches, misses, and performance
-- **Event Format Conversion**: Seamless conversion between Elixir maps and goldrush events
+- Version: 0.1.0
+- OTP app with supervision tree
+- Depends on goldrush ~> 0.1.9 and gen_stage ~> 1.2
+- Published to Hex under the `viable_systems` organization
+- Tests exist but coverage is unknown
+
+## What it does
+
+1. Takes a pattern spec (field/operator/value map, compound `all`/`any`, or named VSM pattern)
+2. Converts it to a goldrush query via `VsmGoldrush.QueryBuilder`
+3. Compiles the query into a BEAM module with `:glc.compile/2`
+4. Processes events by converting Elixir maps to goldrush proplists, running them through the compiled module, and checking output counters to determine match/no-match
+
+## Modules
+
+| Module | Purpose |
+|--------|---------|
+| `VsmGoldrush` | Main API: compile_pattern, process_event, get_stats |
+| `VsmGoldrush.QueryBuilder` | Converts pattern specs to goldrush query terms |
+| `VsmGoldrush.EventConverter` | Converts between Elixir maps and goldrush proplists |
+| `VsmGoldrush.PatternRegistry` | Tracks which patterns are currently compiled |
+| `VsmGoldrush.Patterns.Cybernetic` | 10 pre-defined VSM failure patterns |
+| `VsmGoldrush.Producer` | GenStage producer for streaming integration |
+| `VsmGoldrush.Consumer` | GenStage consumer for streaming integration |
+| `VsmGoldrush.Temporal` | Temporal pattern analysis |
+
+## Pre-defined cybernetic patterns
+
+| Pattern | Detects |
+|---------|---------|
+| `variety_explosion` | Environmental variety exceeding regulatory capacity |
+| `variety_imbalance` | Controller/environment variety mismatch |
+| `channel_saturation` | Queue depth >= 1000, latency >= 5s, or drop rate >= 5% |
+| `s1_s3_breakdown` | Operations-to-management channel failure |
+| `s2_coordination_loop_failure` | Sync failures > 10, conflict rate > 20% |
+| `algedonic_signal` | Pain level >= 0.7 or pleasure level <= 0.3 |
+| `algedonic_channel_blocked` | Critical algedonic bypass non-functional |
+| `recursion_violation` | Recursive system boundary violations |
+| `meta_system_dominance` | Higher recursion level interfering with lower |
+| `homeostatic_failure` | System unable to maintain essential variables |
 
 ## Installation
 
-Add `vsm_goldrush` to your dependencies:
-
 ```elixir
 def deps do
-  [
-    {:vsm_goldrush, "~> 0.1.0", organization: "viable_systems"}
-  ]
+  [{:vsm_goldrush, "~> 0.1.0", organization: "viable_systems"}]
 end
 ```
+
+Depends on `vsm_core` via path dependency when used standalone. In the umbrella project, that dependency is omitted.
 
 ## Usage
 
-### Basic Pattern Matching
-
 ```elixir
-# Initialize the system
 VsmGoldrush.init()
 
-# Compile a simple pattern
+# Compile a pattern
 {:ok, _} = VsmGoldrush.compile_pattern(:high_latency, %{
-  field: :latency,
-  operator: :gt,
-  value: 1000
+  field: :latency, operator: :gt, value: 1000
 })
 
-# Process events
-event = %{type: "api_call", latency: 1500, endpoint: "/users"}
-case VsmGoldrush.process_event(:high_latency, event) do
-  {:match, event} -> 
-    Logger.warn("High latency detected: #{inspect(event)}")
-  :no_match -> 
-    :ok
+# Process an event
+case VsmGoldrush.process_event(:high_latency, %{latency: 1500}) do
+  {:match, event} -> handle_match(event)
+  :no_match -> :ok
 end
 
-# Check statistics
-stats = VsmGoldrush.get_stats(:high_latency)
-# => %{input_count: 1, output_count: 1, filter_count: 0, ...}
-```
-
-### Compound Patterns
-
-```elixir
-# ALL conditions must match
-{:ok, _} = VsmGoldrush.compile_pattern(:critical_failure, %{
-  all: [
-    %{field: :severity, operator: :eq, value: :critical},
-    %{field: :subsystem, operator: :eq, value: "S1"},
-    %{field: :error_rate, operator: :gt, value: 0.1}
-  ]
-})
-
-# ANY condition can match
-{:ok, _} = VsmGoldrush.compile_pattern(:warning_or_error, %{
-  any: [
-    %{field: :level, operator: :eq, value: :warning},
-    %{field: :level, operator: :eq, value: :error}
-  ]
-})
-```
-
-### VSM Cybernetic Patterns
-
-```elixir
-# Use pre-defined VSM patterns
-{:ok, _} = VsmGoldrush.compile_pattern(:variety_explosion, %{
-  vsm_pattern: :variety_explosion
-})
-
-# Or compile all cybernetic patterns at once
+# Or compile all 10 cybernetic patterns at once
 VsmGoldrush.compile_vsm_patterns()
 
-# Available patterns:
-# - :variety_explosion
-# - :variety_imbalance
-# - :channel_saturation
-# - :s1_s3_breakdown
-# - :s2_coordination_loop_failure
-# - :algedonic_signal
-# - :algedonic_channel_blocked
-# - :recursion_violation
-# - :meta_system_dominance
-# - :homeostatic_failure
+# Check per-pattern statistics
+VsmGoldrush.get_stats(:high_latency)
+# => %{input_count: 1, output_count: 1, filter_count: 0, info: ...}
 ```
 
-### Pattern Actions
+## Limitations
 
-Execute functions when patterns match:
-
-```elixir
-action_fn = fn event ->
-  # Send to monitoring system
-  Telemetry.execute([:vsm, :alert], %{event: event})
-  
-  # Trigger algedonic bypass
-  AlgedonicChannel.send_alert(event)
-end
-
-{:ok, _} = VsmGoldrush.compile_pattern_with_action(
-  :algedonic_bypass,
-  %{
-    all: [
-      %{field: :type, operator: :eq, value: "algedonic"},
-      %{field: :pain_level, operator: :gte, value: 0.8}
-    ]
-  },
-  action_fn
-)
-```
-
-### Pattern Management
-
-```elixir
-# List all compiled patterns
-patterns = VsmGoldrush.list_patterns()
-# => [:high_latency, :variety_explosion, :algedonic_signal]
-
-# Delete a pattern
-VsmGoldrush.delete_pattern(:high_latency)
-
-# Reset statistics
-VsmGoldrush.reset_stats(:variety_explosion)
-```
-
-## How It Works
-
-1. **Pattern Compilation**: VSM pattern specifications are converted to goldrush queries
-2. **Query Compilation**: Goldrush compiles queries into optimized BEAM modules
-3. **Event Processing**: Events are converted from Elixir maps to goldrush format
-4. **Native Matching**: Compiled modules perform pattern matching at native speed
-5. **Statistics**: Each pattern tracks input/output/filter counts automatically
-
-## Performance
-
-Goldrush's compiled queries provide significant performance benefits:
-
-- Pattern matching happens at native BEAM speed
-- No interpreter overhead
-- Compiled patterns can process 100,000+ events/second
-- Statistics have minimal overhead via ETS counters
-
-## Configuration
-
-```elixir
-# config/config.exs
-config :vsm_goldrush,
-  compile_patterns_on_start: true,  # Compile VSM patterns at startup
-  cleanup_on_stop: true            # Delete patterns on shutdown
-```
+- Match detection works by comparing goldrush output counters before and after processing, which is not thread-safe under concurrent event processing
+- `vsm_core` path dependency means this cannot be installed from Hex alone without also having vsm_core locally
+- No property-based or fuzz testing
+- Temporal module exists but test coverage is minimal
 
 ## License
 
-MIT License - see LICENSE file for details
+MIT
